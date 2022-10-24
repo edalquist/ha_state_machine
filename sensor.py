@@ -2,14 +2,42 @@
 from __future__ import annotations
 
 import logging
-from homeassistant.components.sensor import SensorEntity
+import json
+from transitions import Machine
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntity,
+    SensorStateClass,
+)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_ENTITY_ID
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import entity_platform
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+import voluptuous as vol
+
+import homeassistant.helpers.config_validation as cv
+
+from .const import DOMAIN
+
 _LOGGER = logging.getLogger(__name__)
+
+
+class StateMachine(Machine):
+    def __init__(self, states):
+        Machine.__init__(
+            self,
+            states=["solid", "liquid", "gas", "plasma"],
+            transitions=[
+                {"trigger": "melt", "source": "solid", "dest": "liquid"},
+                {"trigger": "evaporate", "source": "liquid", "dest": "gas"},
+                {"trigger": "sublimate", "source": "solid", "dest": "gas"},
+                {"trigger": "ionize", "source": "gas", "dest": "plasma"},
+            ],
+            initial="solid",
+        )
 
 
 async def async_setup_entry(
@@ -18,25 +46,69 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Initialize State Machine config entry."""
-    registry = er.async_get(hass)
-    _LOGGER.info("State Machine Config:\n%s", config_entry.as_dict())
-    # Validate + resolve entity registry id to entity_id
-    entity_id = er.async_validate_entity_id(
-        registry, config_entry.options[CONF_ENTITY_ID]
-    )
+    _LOGGER.warning("State Machine Config:\n%s", config_entry.as_dict())
+
     # TODO Optionally validate config entry options before creating entity
     name = config_entry.title
     unique_id = config_entry.entry_id
+    fsm_config = json.loads(config_entry.options["config"])
 
-    async_add_entities([state_machineSensorEntity(unique_id, name, entity_id)])
+    # TODO make the Machine a device with an entity per state
+    sme = StateMachineSensorEntity(unique_id, name, fsm_config)
+    async_add_entities([sme])
+
+    platform = entity_platform.async_get_current_platform()
+    platform.async_register_entity_service(
+        "fsm_transition",
+        {
+            # TODO could put transition options in here!
+            vol.Required("transition"): cv.string
+        },
+        sme.async_fsm_transition,
+    )
 
 
-class state_machineSensorEntity(SensorEntity):
+class StateMachineSensorEntity(SensorEntity):
     """state_machine Sensor."""
 
-    def __init__(self, unique_id: str, name: str, wrapped_entity_id: str) -> None:
+    # Our class is PUSH, so we tell HA that it should not be polled
+    # should_poll = False
+
+    def __init__(self, unique_id: str, name: str, fsm_config: list) -> None:
         """Initialize state_machine Sensor."""
         super().__init__()
-        self._wrapped_entity_id = wrapped_entity_id
+        _LOGGER.warning("State Machine Config:%s\n%s", type(fsm_config), fsm_config)
+        self._machine = StateMachine(fsm_config)
         self._attr_name = name
         self._attr_unique_id = unique_id
+        _LOGGER.warning("State Machine:\n%s", self._machine)
+        _LOGGER.warning("State Machine:\n%s", self._machine.state)
+
+    async def async_fsm_transition(self, entity_id, call: ServiceCall) -> None:
+        """Handle Transition Events"""
+        _LOGGER.warning("State Change: %s - %s", type(entity_id), call)
+        self._machine.trigger(call.data["transition"])
+
+    # TODO(fill this out for the machine)
+    # @property
+    # def device_info(self) -> DeviceInfo:
+    #     """Information about this entity/device."""
+    #     return {
+    #         "identifiers": {(DOMAIN, self._roller.roller_id)},
+    #         # If desired, the name for the device could be different to the entity
+    #         "name": self.name,
+    #         "sw_version": self._roller.firmware_version,
+    #         "model": self._roller.model,
+    #         "manufacturer": self._roller.hub.manufacturer,
+    #     }
+
+    @property
+    def available(self) -> bool:
+        return True
+
+    def update(self) -> None:
+        """Fetch new state data for the sensor.
+        This is the only method that should fetch new data for Home Assistant.
+        """
+        _LOGGER.warning("Update: %s", self._machine.state)
+        self._attr_native_value = self._machine.state

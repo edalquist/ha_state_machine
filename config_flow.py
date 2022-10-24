@@ -18,8 +18,11 @@ from .const import DOMAIN
 
 OPTIONS_SCHEMA = vol.Schema(
     {
-        vol.Required(CONF_ENTITY_ID): selector.EntitySelector(
-            # selector.EntitySelectorConfig(domain="sensor")
+        # vol.Required(CONF_ENTITY_ID): selector.EntitySelector(
+        #     # selector.EntitySelectorConfig(domain="sensor")
+        # ),
+        vol.Required("config"): selector.TextSelector(
+            selector.TextSelectorConfig(multiline=True)
         ),
     }
 )
@@ -27,9 +30,6 @@ OPTIONS_SCHEMA = vol.Schema(
 CONFIG_SCHEMA = vol.Schema(
     {
         vol.Required("name"): selector.TextSelector(),
-        # vol.Required("config"): selector.TextSelector(
-        #     selector.TextSelectorConfig(multiline=True)
-        # ),
     }
 ).extend(OPTIONS_SCHEMA.schema)
 

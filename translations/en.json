@@ -4,8 +4,8 @@
       "user": {
         "description": "New NEW_NAME Sensor",
         "data": {
-          "entity": "Input sensor",
-          "name": "Name"
+          "name": "Name",
+          "config": "State Machine Config"
         }
       }
     }
