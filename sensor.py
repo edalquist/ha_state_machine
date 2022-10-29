@@ -26,6 +26,8 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class StateMachine(Machine):
+    """State Machine used in sensor"""
+
     def __init__(self, states):
         Machine.__init__(
             self,
@@ -64,15 +66,23 @@ async def async_setup_entry(
             # TODO could put transition options in here!
             vol.Required("transition"): cv.string
         },
-        sme.async_fsm_transition,
+        async_fsm_transition,
     )
+
+
+async def async_fsm_transition(
+    entity: StateMachineSensorEntity, call: ServiceCall
+) -> None:
+    """Handle Transition Events"""
+    _LOGGER.warning("State Change: %s", call)
+    entity.transition(call.data["transition"])
 
 
 class StateMachineSensorEntity(SensorEntity):
     """state_machine Sensor."""
 
     # Our class is PUSH, so we tell HA that it should not be polled
-    # should_poll = False
+    should_poll = False
 
     def __init__(self, unique_id: str, name: str, fsm_config: list) -> None:
         """Initialize state_machine Sensor."""
@@ -81,13 +91,8 @@ class StateMachineSensorEntity(SensorEntity):
         self._machine = StateMachine(fsm_config)
         self._attr_name = name
         self._attr_unique_id = unique_id
-        _LOGGER.warning("State Machine:\n%s", self._machine)
+        self._attr_native_value = self._machine.state
         _LOGGER.warning("State Machine:\n%s", self._machine.state)
-
-    async def async_fsm_transition(self, entity_id, call: ServiceCall) -> None:
-        """Handle Transition Events"""
-        _LOGGER.warning("State Change: %s - %s", type(entity_id), call)
-        self._machine.trigger(call.data["transition"])
 
     # TODO(fill this out for the machine)
     # @property
@@ -102,6 +107,13 @@ class StateMachineSensorEntity(SensorEntity):
     #         "manufacturer": self._roller.hub.manufacturer,
     #     }
 
+    def transition(self, transition: str) -> None:
+        """Executes transition"""
+        self._machine.trigger(transition)
+        self._attr_native_value = self._machine.state
+        # Notify HA the state has changed
+        self.schedule_update_ha_state()
+
     @property
     def available(self) -> bool:
         return True
@@ -111,4 +123,4 @@ class StateMachineSensorEntity(SensorEntity):
         This is the only method that should fetch new data for Home Assistant.
         """
         _LOGGER.warning("Update: %s", self._machine.state)
-        self._attr_native_value = self._machine.state
+        return self._machine.state

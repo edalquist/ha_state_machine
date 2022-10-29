@@ -17,9 +17,6 @@ PLATFORMS: list[Platform] = [Platform.SENSOR]
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up State Machine from a config entry."""
-    # TODO Optionally store an object for your platforms to access
-    # hass.data[DOMAIN][entry.entry_id] = ...
-
     # TODO Optionally validate config entry options before setting up platform
 
     # Register platforms
