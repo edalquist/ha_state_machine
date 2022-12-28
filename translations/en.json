@@ -1,20 +1,27 @@
 {
   "config": {
+    "error": {
+      "schema_parse_error": "Failed to parse Schema YAML"
+    },
     "step": {
       "user": {
-        "description": "New NEW_NAME Sensor",
+        "title": "Configure State Machine",
         "data": {
-          "name": "Name",
-          "config": "State Machine Config"
+          "name": "State Machine Name",
+          "schema_yaml": "YAML Schema"
         }
       }
     }
   },
   "options": {
+    "error": {
+      "schema_parse_error": "Failed to parse Schema YAML"
+    },
     "step": {
       "init": {
+        "title": "Configure Schema",
         "data": {
-          "entity": "[%key:component::NEW_DOMAIN::config::step::user::description%]"
+          "schema_yaml": "YAML Schema"
         }
       }
     }

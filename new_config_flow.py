@@ -8,11 +8,7 @@ import voluptuous as vol
 
 from homeassistant.core import callback
 from homeassistant.const import CONF_ENTITY_ID
-from homeassistant.helpers.selector import (
-    TextSelector,
-    TextSelectorConfig,
-    TextSelectorType,
-)
+from homeassistant.helpers import selector
 from homeassistant import data_entry_flow, config_entries, core
 from homeassistant.helpers.schema_config_entry_flow import (
     SchemaConfigFlowHandler,
@@ -21,12 +17,12 @@ from homeassistant.helpers.schema_config_entry_flow import (
 )
 import homeassistant.helpers.config_validation as cv
 import logging
-import yaml
 
 from .const import DOMAIN
 
 CONF_NAME = "name"
-CONF_SCHEMA_YAML = "schema_yaml"
+CONF_STATES = "states"
+CONF_STATE_LIST = "state_list"
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -37,12 +33,14 @@ def normalize_input(user_input: Optional[dict[str, Any]]) -> dict[str, str]:
 
     errors = {}
 
-    try:
-        schema = yaml.safe_load(user_input[CONF_SCHEMA_YAML])
-        _LOGGER.warning("Schema: %s", schema)
-    except yaml.YAMLError as exc:
-        _LOGGER.warning("Schema Error: %s", exc)
-        errors["base"] = "schema_parse_error"
+    if CONF_STATES not in user_input:
+        errors["base"] = "state_csv"
+    else:
+        states = [x.strip() for x in user_input[CONF_STATES].split(",")]
+        if len(states) < 2:
+            errors["base"] = "state_min_2"
+        else:
+            user_input[CONF_STATE_LIST] = states
 
     return errors
 
@@ -67,11 +65,20 @@ class StateMachineConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self.options.update(user_input)
 
             if not errors:
-                return self.async_create_entry(
-                    title=user_input[CONF_NAME],
-                    data={},
-                    options=user_input,
+                _LOGGER.warning("Show Triggers Form: %s", user_input)
+                return self.async_show_form(
+                    step_id="triggers",
+                    data_schema=_build_options_schema__transitions(
+                        self.hass, self.options, self.options[CONF_STATE_LIST]
+                    ),
+                    errors=errors,
                 )
+
+                # return self.async_create_entry(
+                #     title=user_input["name"],
+                #     data={},
+                #     options=user_input,
+                # )
 
         return self.async_show_form(
             step_id="user",
@@ -108,7 +115,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
 
             if not errors:
                 return self.async_create_entry(
-                    title=self.options[CONF_NAME],
+                    title=user_input["name"],
                     data=self.options,
                 )
 
@@ -124,6 +131,7 @@ def _build_setup_schema(
 ) -> vol.Schema:
     return vol.Schema(
         {vol.Required(CONF_NAME, default=user_input.get(CONF_NAME)): cv.string}
+        # {vol.Required(CONF_NAME): cv.string}
     ).extend(_build_options_schema__states(hass, user_input).schema)
 
 
@@ -131,9 +139,22 @@ def _build_options_schema__states(
     hass: core.HomeAssistant, user_input: dict[str, Any]
 ) -> vol.Schema:
     return vol.Schema(
-        {
-            vol.Required(
-                CONF_SCHEMA_YAML, default=user_input.get(CONF_SCHEMA_YAML)
-            ): TextSelector(TextSelectorConfig(multiline=True))
-        }
+        {vol.Required(CONF_STATES, default=user_input.get(CONF_STATES)): cv.string}
     )
+
+
+def _build_options_schema__transitions(
+    hass: core.HomeAssistant, user_input: dict[str, Any], states: list[str]
+) -> vol.Schema:
+    schema = {}
+
+    for state in states:
+        schema[vol.Required(state, default="Triggers for %s" % state)] = cv.string
+
+    return vol.Schema(schema)
+
+
+# List of States
+#
+#
+#

@@ -53,7 +53,12 @@ async def async_setup_entry(
     # TODO Optionally validate config entry options before creating entity
     name = config_entry.title
     unique_id = config_entry.entry_id
-    fsm_config = json.loads(config_entry.options["config"])
+    config_json = config_entry.options.get("config", "{}")
+    try:
+        fsm_config = json.loads(config_json)
+    except:
+        _LOGGER.error("Failed to parse FSM Config:\n%s", config_json)
+        fsm_config = {}
 
     # TODO make the Machine a device with an entity per state
     sme = StateMachineSensorEntity(unique_id, name, fsm_config)
