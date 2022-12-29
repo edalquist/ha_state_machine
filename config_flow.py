@@ -22,11 +22,13 @@ from homeassistant.helpers.schema_config_entry_flow import (
 import homeassistant.helpers.config_validation as cv
 import logging
 import yaml
+import json
 
 from .const import DOMAIN
 
 CONF_NAME = "name"
 CONF_SCHEMA_YAML = "schema_yaml"
+CONF_SCHEMA_JSON = "schema_json"
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -38,11 +40,16 @@ def normalize_input(user_input: Optional[dict[str, Any]]) -> dict[str, str]:
     errors = {}
 
     try:
-        schema = yaml.safe_load(user_input[CONF_SCHEMA_YAML])
+        schema = json.loads(user_input[CONF_SCHEMA_JSON])
         _LOGGER.warning("Schema: %s", schema)
-    except yaml.YAMLError as exc:
+        # Validate schema structure
+        if "state" not in schema or "status" not in schema["state"]:
+            errors[CONF_SCHEMA_JSON] = "no_state_or_status"
+        elif "transitions" not in schema or not schema["transitions"]:
+            errors[CONF_SCHEMA_JSON] = "no_transitions"
+    except ValueError as exc:
         _LOGGER.warning("Schema Error: %s", exc)
-        errors["base"] = "schema_parse_error"
+        errors[CONF_SCHEMA_JSON] = "schema_parse_error"
 
     return errors
 
@@ -133,7 +140,7 @@ def _build_options_schema__states(
     return vol.Schema(
         {
             vol.Required(
-                CONF_SCHEMA_YAML, default=user_input.get(CONF_SCHEMA_YAML)
+                CONF_SCHEMA_JSON, default=user_input.get(CONF_SCHEMA_JSON)
             ): TextSelector(TextSelectorConfig(multiline=True))
         }
     )

@@ -1,27 +1,33 @@
 {
   "config": {
     "error": {
-      "schema_parse_error": "Failed to parse Schema YAML"
+      "schema_parse_error": "Failed to parse Schema JSON",
+      "no_state_or_status": "Schema does not have an initial state specified",
+      "no_transitions": "No transitions specified"
     },
     "step": {
       "user": {
         "title": "Configure State Machine",
         "data": {
           "name": "State Machine Name",
-          "schema_yaml": "YAML Schema"
+          "schema_yaml": "YAML Schema",
+          "schema_json": "JSON Schema"
         }
       }
     }
   },
   "options": {
     "error": {
-      "schema_parse_error": "Failed to parse Schema YAML"
+      "schema_parse_error": "Failed to parse Schema JSON",
+      "no_state_or_status": "Schema does not have an initial state specified",
+      "no_transitions": "No transitions specified"
     },
     "step": {
       "init": {
         "title": "Configure Schema",
         "data": {
-          "schema_yaml": "YAML Schema"
+          "schema_yaml": "YAML Schema",
+          "schema_json": "JSON Schema"
         }
       }
     }
