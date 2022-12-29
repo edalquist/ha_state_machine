@@ -65,8 +65,6 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Initialize State Machine config entry."""
-    _LOGGER.warning("State Machine Config:\n%s", config_entry.as_dict())
-
     name = config_entry.title
     unique_id = config_entry.entry_id
     config_json = config_entry.options.get("schema_json", "{}")
@@ -97,7 +95,6 @@ async def async_fsm_transition(
     entity: StateMachineSensorEntity, call: ServiceCall
 ) -> None:
     """Handle Transition Events"""
-    _LOGGER.warning("State Change: %s", call)
     entity.transition(call.data["transition"])
 
 
