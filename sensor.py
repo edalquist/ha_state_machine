@@ -4,16 +4,11 @@ from __future__ import annotations
 import logging
 import json
 import transitions
+import dataclasses
 from transitions import Machine
-from homeassistant.components.sensor import (
-    SensorDeviceClass,
-    SensorEntity,
-    SensorStateClass,
-)
+from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_ENTITY_ID
 from homeassistant.core import HomeAssistant, ServiceCall
-from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import entity_platform
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -27,29 +22,41 @@ from .const import DOMAIN
 _LOGGER = logging.getLogger(__name__)
 
 
+@dataclasses.dataclass
+class FsmConfig:
+    """FSM Config Data Model"""
+
+    initial: str
+    states: list[str]
+    transitions: list[dict[str, str]]
+
+
 class StateMachine(Machine):
     """State Machine used in sensor"""
 
-    def __init__(self, fsm_config: dict):
-        initial = fsm_config["state"]["status"]
-        states = set()
-        transitions = []
-        for src, triggers in fsm_config["transitions"].items():
-            states.add(src)
-            for trigger, dst in triggers.items():
-                states.add(dst)
-                transitions.append({"trigger": trigger, "source": src, "dest": dst})
-
-        _LOGGER.warning("Initial: %s", initial)
-        _LOGGER.warning("States: %s", list(states))
-        _LOGGER.warning("Transitions: %s", transitions)
-
+    def __init__(self, fsm_config: FsmConfig) -> None:
         Machine.__init__(
             self,
-            states=list(states),
-            transitions=transitions,
-            initial=initial,
+            states=fsm_config.states,
+            transitions=fsm_config.transitions,
+            initial=fsm_config.initial,
+            ignore_invalid_triggers=True,
         )
+
+
+def to_transitions_config(config_json: dict) -> FsmConfig:
+    """Convert JSON fsm config to Transitions config"""
+    initial = config_json["state"]["status"]
+    states = set()
+    trans = []
+
+    for src, triggers in config_json["transitions"].items():
+        states.add(src)
+        for trigger, dst in triggers.items():
+            states.add(dst)
+            trans.append({"trigger": trigger, "source": src, "dest": dst})
+
+    return FsmConfig(initial, list(states), trans)
 
 
 async def async_setup_entry(
@@ -64,13 +71,15 @@ async def async_setup_entry(
     unique_id = config_entry.entry_id
     config_json = config_entry.options.get("schema_json", "{}")
     try:
-        fsm_config = json.loads(config_json)
+        config_json = json.loads(config_json)
     except ValueError as exc:
-        _LOGGER.error("Failed to parse FSM Config:\n%s", config_json)
-        fsm_config = {}
+        _LOGGER.error("Failed to parse FSM Config: %s\n%s", exc, config_json)
+        config_json = {}
 
-    # TODO make the Machine a device with an entity per state
+    fsm_config = to_transitions_config(config_json)
+
     sme = StateMachineSensorEntity(unique_id, name, fsm_config)
+    # TODO add button for each transition
     async_add_entities([sme])
 
     platform = entity_platform.async_get_current_platform()
@@ -98,17 +107,14 @@ class StateMachineSensorEntity(SensorEntity):
     # Our class is PUSH, so we tell HA that it should not be polled
     should_poll = False
 
-    def __init__(self, unique_id: str, name: str, fsm_config: dict) -> None:
+    def __init__(self, unique_id: str, name: str, fsm_config: FsmConfig) -> None:
         """Initialize state_machine Sensor."""
         super().__init__()
-        _LOGGER.warning("State Machine Config:%s\n%s", type(fsm_config), fsm_config)
         self._machine = StateMachine(fsm_config)
         self._attr_name = name
         self._attr_unique_id = unique_id
         self._attr_native_value = self._machine.state
-        _LOGGER.warning("State Machine:\n%s", self._machine.state)
 
-    # TODO(fill this out for the machine)
     @property
     def device_info(self) -> DeviceInfo:
         """Information about this entity/device."""

@@ -1,8 +1,7 @@
 """Config flow for State Machine integration."""
 from __future__ import annotations
 
-from collections.abc import Mapping
-from typing import Any, cast, Optional
+from typing import Any, Optional
 
 import voluptuous as vol
 
@@ -11,17 +10,10 @@ from homeassistant.const import CONF_ENTITY_ID
 from homeassistant.helpers.selector import (
     TextSelector,
     TextSelectorConfig,
-    TextSelectorType,
 )
 from homeassistant import data_entry_flow, config_entries, core
-from homeassistant.helpers.schema_config_entry_flow import (
-    SchemaConfigFlowHandler,
-    SchemaFlowFormStep,
-    SchemaFlowMenuStep,
-)
 import homeassistant.helpers.config_validation as cv
 import logging
-import yaml
 import json
 
 from .const import DOMAIN
@@ -35,13 +27,10 @@ _LOGGER = logging.getLogger(__name__)
 
 def normalize_input(user_input: Optional[dict[str, Any]]) -> dict[str, str]:
     """Validate states"""
-    _LOGGER.warning("Validate: %s", user_input)
-
     errors = {}
 
     try:
         schema = json.loads(user_input[CONF_SCHEMA_JSON])
-        _LOGGER.warning("Schema: %s", schema)
         # Validate schema structure
         if "state" not in schema or "status" not in schema["state"]:
             errors[CONF_SCHEMA_JSON] = "no_state_or_status"
