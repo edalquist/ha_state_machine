@@ -19,7 +19,7 @@
       "middle": "RUNNING"
     },
     "DONE": {
-      "delay_done": "IDLE"
+      "timeout": { "after": 15, "to": "IDLE" }
     }
   }
 }
