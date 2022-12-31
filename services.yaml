@@ -1,0 +1,16 @@
+trigger:
+  description: FSM Transition Trigger.
+  target:
+    entity:
+      domain: sensor
+      integration: state_machine
+    device:
+      integration: state_machine
+  fields:
+    trigger:
+      name: Trigger
+      description: The name of the trigger to execute on the target Finite State Machine
+      example: below
+      required: true
+      selector:
+        text:

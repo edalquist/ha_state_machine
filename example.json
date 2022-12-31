@@ -1,0 +1,25 @@
+{
+  "state": {
+    "status": "IDLE"
+  },
+  "transitions": {
+    "IDLE": {
+      "above": "STARTING"
+    },
+    "STARTING": {
+      "timeout": { "after": 60, "to": "RUNNING" },
+      "below": "IDLE"
+    },
+    "RUNNING": {
+      "below": "STOPPING"
+    },
+    "STOPPING": {
+      "timeout": { "after": 300, "to": "DONE" },
+      "above": "RUNNING",
+      "middle": "RUNNING"
+    },
+    "DONE": {
+      "delay_done": "IDLE"
+    }
+  }
+}

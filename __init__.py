@@ -2,17 +2,46 @@
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity_component import EntityComponent
+from homeassistant.helpers.typing import ConfigType
+import voluptuous as vol
 
-from .const import DOMAIN
+import homeassistant.helpers.config_validation as cv
+
+from .const import DOMAIN, StateMachineEntityFeature
+from .sensor import StateMachineSensorEntity
 
 _LOGGER = logging.getLogger(__name__)
 
 # List of platforms to support. There should be a matching .py file for each,
 # eg <cover.py> and <sensor.py>
 PLATFORMS: list[Platform] = [Platform.SENSOR]
+SCAN_INTERVAL = timedelta(seconds=15)
+
+
+# async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+#     """Track states and offer events for covers."""
+#     component = hass.data[DOMAIN] = EntityComponent[StateMachineSensorEntity](
+#         _LOGGER, DOMAIN, hass, SCAN_INTERVAL
+#     )
+
+#     await component.async_setup(config)
+
+#     component.async_register_entity_service(
+#         "trigger",
+#         {
+#             # TODO could put transition options in here?
+#             vol.Required("trigger"): cv.string
+#         },
+#         "async_trigger",
+#         [StateMachineEntityFeature.TRANSITION],
+#     )
+
+#     return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

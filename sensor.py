@@ -17,7 +17,7 @@ import voluptuous as vol
 
 import homeassistant.helpers.config_validation as cv
 
-from .const import DOMAIN
+from .const import DOMAIN, StateMachineEntityFeature
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -34,13 +34,14 @@ class FsmConfig:
 class StateMachine(Machine):
     """State Machine used in sensor"""
 
-    def __init__(self, fsm_config: FsmConfig) -> None:
+    def __init__(self, fsm_config: FsmConfig, after_state_change) -> None:
         Machine.__init__(
             self,
             states=fsm_config.states,
             transitions=fsm_config.transitions,
             initial=fsm_config.initial,
             ignore_invalid_triggers=True,
+            after_state_change=after_state_change,
         )
 
 
@@ -77,25 +78,21 @@ async def async_setup_entry(
     fsm_config = to_transitions_config(config_json)
 
     sme = StateMachineSensorEntity(unique_id, name, fsm_config)
-    # TODO add button for each transition
+    # TODO add button for each transition?
     async_add_entities([sme])
 
     platform = entity_platform.async_get_current_platform()
     platform.async_register_entity_service(
-        "fsm_transition",
-        {
-            # TODO could put transition options in here!
-            vol.Required("transition"): cv.string
-        },
-        async_fsm_transition,
+        "trigger",
+        {vol.Required("trigger"): cv.string},
+        async_trigger,
+        [StateMachineEntityFeature.TRANSITION],
     )
 
 
-async def async_fsm_transition(
-    entity: StateMachineSensorEntity, call: ServiceCall
-) -> None:
-    """Handle Transition Events"""
-    entity.transition(call.data["transition"])
+async def async_trigger(entity: StateMachineSensorEntity, call: ServiceCall) -> None:
+    """Handle Trigger Events"""
+    entity.trigger(call.data["trigger"])
 
 
 class StateMachineSensorEntity(SensorEntity):
@@ -104,10 +101,19 @@ class StateMachineSensorEntity(SensorEntity):
     # Our class is PUSH, so we tell HA that it should not be polled
     should_poll = False
 
+    _attr_icon = "mdi:state-machine"
+
+    # Declare supported features
+    _attr_supported_features: StateMachineEntityFeature = (
+        StateMachineEntityFeature.TRANSITION
+    )
+
     def __init__(self, unique_id: str, name: str, fsm_config: FsmConfig) -> None:
         """Initialize state_machine Sensor."""
         super().__init__()
-        self._machine = StateMachine(fsm_config)
+        self._machine = StateMachine(
+            fsm_config, after_state_change=self.schedule_update_ha_state
+        )
         self._attr_name = name
         self._attr_unique_id = unique_id
         self._attr_native_value = self._machine.state
@@ -121,8 +127,10 @@ class StateMachineSensorEntity(SensorEntity):
             "sw_version": "0.0.1",
         }
 
-    def transition(self, transition: str) -> None:
-        """Executes transition"""
+    def trigger(self, transition: str) -> None:
+        """Executes trigger"""
+        pre_state = self._machine.state
+
         try:
             self._machine.trigger(transition)
         except transitions.core.MachineError as exc:
@@ -133,19 +141,28 @@ class StateMachineSensorEntity(SensorEntity):
             # }
             # hass.bus.async_fire("mydomain_event", event_data)
             # TODO support boolean toggle for ignoring invalid transitions
-            _LOGGER.error("Failed to execute transition: %s", exc)
+            _LOGGER.error(
+                "Trigger Error %s on %s[%s]: %s", transition, self.name, self.state, exc
+            )
 
-        self._attr_native_value = self._machine.state
-        # Notify HA the state has changed
-        self.schedule_update_ha_state()
+        _LOGGER.info(
+            "Trigger '%s' on '%s' [%s -> %s]",
+            transition,
+            self.name,
+            pre_state,
+            self._machine.state,
+        )
 
     @property
-    def available(self) -> bool:
-        return True
+    def native_value(self) -> str:
+        return self._machine.state
+
+    # @property
+    # def available(self) -> bool:
+    #     return True
 
     def update(self) -> None:
         """Fetch new state data for the sensor.
         This is the only method that should fetch new data for Home Assistant.
         """
-        _LOGGER.warning("Update: %s", self._machine.state)
         return self._machine.state
