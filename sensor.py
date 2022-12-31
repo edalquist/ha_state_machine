@@ -5,7 +5,8 @@ import logging
 import json
 import transitions
 import dataclasses
-from transitions import Machine
+from transitions import Machine, State
+from transitions.extensions.states import add_state_features, Tags, Timeout
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
@@ -27,10 +28,11 @@ class FsmConfig:
     """FSM Config Data Model"""
 
     initial: str
-    states: list[str]
+    states: list[State]
     transitions: list[dict[str, str]]
 
 
+@add_state_features(Tags, Timeout)
 class StateMachine(Machine):
     """State Machine used in sensor"""
 
@@ -40,24 +42,35 @@ class StateMachine(Machine):
             states=fsm_config.states,
             transitions=fsm_config.transitions,
             initial=fsm_config.initial,
-            ignore_invalid_triggers=True,
+            ignore_invalid_triggers=True,  # TODO make this configurable, what to do on error?
             after_state_change=after_state_change,
         )
 
 
-def to_transitions_config(config_json: dict) -> FsmConfig:
+def to_transitions_config(entry_id: str, config_json: dict) -> FsmConfig:
     """Convert JSON fsm config to Transitions config"""
     initial = config_json["state"]["status"]
-    states = set()
-    trans = []
+    states: dict[str, State] = {}
+    transition_lst: list[dict] = []
 
-    for src, triggers in config_json["transitions"].items():
-        states.add(src)
-        for trigger, dst in triggers.items():
-            states.add(dst)
-            trans.append({"trigger": trigger, "source": src, "dest": dst})
+    for name, triggers in config_json["transitions"].items():
+        if "timeout" in triggers:
+            timeout = triggers["timeout"]
+            timeout_trigger = entry_id + "__" + timeout["to"]
+            states[name] = Timeout(
+                name, timeout=timeout["after"], on_timeout=timeout_trigger
+            )
+            # Add a synthetic trigger for timeout execution
+            transition_lst.append(
+                {"trigger": timeout_trigger, "source": name, "dest": timeout["to"]}
+            )
+        else:
+            states[name] = State(name)
 
-    return FsmConfig(initial, list(states), trans)
+        for trigger, dest in triggers.items():
+            transition_lst.append({"trigger": trigger, "source": name, "dest": dest})
+
+    return FsmConfig(initial, list(states.values()), transition_lst)
 
 
 async def async_setup_entry(
@@ -75,7 +88,7 @@ async def async_setup_entry(
         _LOGGER.error("Failed to parse FSM Config: %s\n%s", exc, config_json)
         config_json = {}
 
-    fsm_config = to_transitions_config(config_json)
+    fsm_config = to_transitions_config(config_entry.entry_id, config_json)
 
     sme = StateMachineSensorEntity(unique_id, name, fsm_config)
     # TODO add button for each transition?
@@ -140,7 +153,6 @@ class StateMachineSensorEntity(SensorEntity):
             #     "type": "motion_detected",
             # }
             # hass.bus.async_fire("mydomain_event", event_data)
-            # TODO support boolean toggle for ignoring invalid transitions
             _LOGGER.error(
                 "Trigger Error %s on %s[%s]: %s", transition, self.name, self.state, exc
             )
@@ -156,10 +168,6 @@ class StateMachineSensorEntity(SensorEntity):
     @property
     def native_value(self) -> str:
         return self._machine.state
-
-    # @property
-    # def available(self) -> bool:
-    #     return True
 
     def update(self) -> None:
         """Fetch new state data for the sensor.

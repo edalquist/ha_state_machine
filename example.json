@@ -7,14 +7,14 @@
       "above": "STARTING"
     },
     "STARTING": {
-      "timeout": { "after": 60, "to": "RUNNING" },
+      "timeout": { "after": 6, "to": "RUNNING" },
       "below": "IDLE"
     },
     "RUNNING": {
       "below": "STOPPING"
     },
     "STOPPING": {
-      "timeout": { "after": 300, "to": "DONE" },
+      "timeout": { "after": 15, "to": "DONE" },
       "above": "RUNNING",
       "middle": "RUNNING"
     },
