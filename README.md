@@ -57,55 +57,53 @@ state machine entity based on the dryer's current power.
 When the state machine eventually cycles to `DONE` that trigger results in a notification being sent.
 
 ```yaml
-alias: Drier Notifier
+alias: "!Laundry: Dryer Notifier"
 description: ""
 trigger:
-  - platform: state
-    entity_id:
-      - input_number.dryer_power
   - platform: state
     entity_id:
       - sensor.dryer_state
     to: DONE
     id: DRYER_DONE
+  - platform: numeric_state
+    entity_id: switch.dryer_plug_switch
+    above: 200
+    id: FSM:above
+  - platform: numeric_state
+    entity_id: switch.dryer_plug_switch
+    id: FSM:below
+    below: 20
+  - platform: numeric_state
+    entity_id: switch.dryer_plug_switch
+    id: FSM:middle
+    below: 200
+    above: 20
 condition: []
 action:
   - choose:
       - conditions:
+          - condition: template
+            alias: FSM Event
+            value_template: |
+              {{trigger.id.startswith('FSM:')}}
+        sequence:
+          - service: state_machine.trigger
+            data:
+              trigger: "{{trigger.id[4:]}}"
+            target:
+              entity_id: sensor.dryer_state
+      - conditions:
           - condition: trigger
             id: DRYER_DONE
         sequence:
-          - service: notify.notify
+          - service: notify.iq_notify_parents
             data:
-              message: Drier Is Done
-    default:
-      - choose:
-          - conditions:
-              - condition: numeric_state
-                entity_id: input_number.dryer_power
-                above: 50
-            sequence:
-              - service: state_machine.trigger
-                data:
-                  trigger: above
-                target:
-                  entity_id: sensor.dryer_state
-          - conditions:
-              - condition: numeric_state
-                entity_id: input_number.dryer_power
-                below: 15
-            sequence:
-              - service: state_machine.trigger
-                data:
-                  trigger: below
-                target:
-                  entity_id: sensor.dryer_state
-        default:
-          - service: state_machine.trigger
-            data:
-              trigger: middle
-            target:
-              entity_id: sensor.dryer_state
+              message: >-
+                Dryer is Done{{'<br>Washer Is Still Running' if
+                states('sensor.washer_state') not in ['DONE', 'IDLE'] else ''}}
+              title: Laundry
+              data:
+                mode: only_home_then_away
 mode: queued
 max: 10
 ```
