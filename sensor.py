@@ -155,10 +155,18 @@ class StateMachineSensorEntity(SensorEntity):
         self._machine = StateMachine(
             fsm_config,
             after_state_change=self.schedule_update_ha_state,
+            set_timeout_context=self._set_timeout_context,
         )
         self._attr_name = name
         self._attr_unique_id = unique_id
         self._attr_native_value = self._machine.state
+
+    def _set_timeout_context(self) -> None:
+        # TODO this gets called but async_set_context doesn't impact the "triggered by" info in LogBook
+        # self.async_set_context(
+        #     Context(parent_id="state_machine", id=self._attr_unique_id)
+        # )
+        pass
 
     @property
     def device_info(self) -> DeviceInfo:
