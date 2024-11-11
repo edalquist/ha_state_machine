@@ -1,23 +1,24 @@
 """Sensor platform for State Machine integration."""
+
 from __future__ import annotations
 
-import logging
-import json
-import transitions
-import dataclasses
 from collections.abc import Callable
-from transitions import Machine, State
-from transitions.extensions.states import add_state_features, Tags, Timeout
-from homeassistant.components.sensor import SensorEntity
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, ServiceCall, Context
-from homeassistant.helpers import entity_platform
-from homeassistant.helpers.entity import DeviceInfo
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+import dataclasses
+import json
+import logging
 
+import transitions
+from transitions import Machine, State
+from transitions.extensions.states import Tags, Timeout, add_state_features
 import voluptuous as vol
 
+from homeassistant.components.sensor import SensorEntity
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.helpers import entity_platform
 import homeassistant.helpers.config_validation as cv
+from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN, StateMachineEntityFeature
 
@@ -26,7 +27,7 @@ _LOGGER = logging.getLogger(__name__)
 
 @dataclasses.dataclass
 class FsmConfig:
-    """FSM Config Data Model"""
+    """FSM Config Data Model."""
 
     initial: str
     states: list[State]
@@ -35,7 +36,7 @@ class FsmConfig:
 
 @add_state_features(Tags, Timeout)
 class StateMachine(Machine):
-    """State Machine used in sensor"""
+    """State Machine used in sensor."""
 
     def __init__(
         self,
@@ -43,6 +44,8 @@ class StateMachine(Machine):
         after_state_change: Callable,
         set_timeout_context: Callable,
     ) -> None:
+        """Init the state machine."""
+
         Machine.__init__(
             self,
             states=fsm_config.states,
@@ -58,17 +61,17 @@ class StateMachine(Machine):
         self._all_triggers = set(self.get_triggers(*self.states.keys()))
 
     def has_trigger(self, trigger: str) -> bool:
-        """Check if the trigger exists in the Machine"""
+        """Check if the trigger exists in the Machine."""
         return trigger in self._all_triggers
 
     def set_timeout_context(self) -> None:
-        """Call the set_timeout_context callback"""
+        """Call the set_timeout_context callback."""
         if self._stc:
             self._stc()
 
 
 def to_transitions_config(entry_id: str, config_json: dict) -> FsmConfig:
-    """Convert JSON fsm config to Transitions config"""
+    """Convert JSON fsm config to Transitions config."""
     initial = config_json["state"]["status"]
     states: dict[str, State] = {}
     transition_lst: list[dict] = []
@@ -129,7 +132,7 @@ async def async_setup_entry(
 
 
 async def async_trigger(entity: StateMachineSensorEntity, call: ServiceCall) -> None:
-    """Handle Trigger Events"""
+    """Handle Trigger Events."""
     entity.trigger(call.data["trigger"])
 
 
@@ -152,18 +155,10 @@ class StateMachineSensorEntity(SensorEntity):
         self._machine = StateMachine(
             fsm_config,
             after_state_change=self.schedule_update_ha_state,
-            set_timeout_context=self._set_timeout_context,
         )
         self._attr_name = name
         self._attr_unique_id = unique_id
         self._attr_native_value = self._machine.state
-
-    def _set_timeout_context(self) -> None:
-        # TODO this gets called but async_set_context doesn't impact the "triggered by" info in LogBook
-        # self.async_set_context(
-        #     Context(parent_id="state_machine", id=self._attr_unique_id)
-        # )
-        pass
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -175,14 +170,19 @@ class StateMachineSensorEntity(SensorEntity):
         )
 
     def trigger(self, trigger: str) -> None:
-        """Executes trigger"""
+        """Execute the trigger."""
+
         pre_state = self._machine.state
 
         if not self._machine.has_trigger(trigger):
             # TODO is there a better way to communicate service errors?
             raise transitions.core.MachineError(
-                "'%s' is not a possible trigger on '%s'" % (trigger, self.name)
+                f"'{trigger}' is not a possible trigger on '{self.name}'"
             )
+
+        if not self._machine.may_trigger(trigger):
+            _LOGGER.debug("Cannot trigger %s from %s", trigger, self._machine.state)
+            return
 
         try:
             self._machine.trigger(trigger)
@@ -211,6 +211,7 @@ class StateMachineSensorEntity(SensorEntity):
 
     def update(self) -> None:
         """Fetch new state data for the sensor.
+
         This is the only method that should fetch new data for Home Assistant.
         """
         return self._machine.state
