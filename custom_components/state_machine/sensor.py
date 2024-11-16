@@ -174,7 +174,7 @@ class StateMachineSensorEntity(SensorEntity):
         return DeviceInfo(
             identifiers={(DOMAIN, str(self._attr_unique_id))},
             name=self.name,
-            sw_version="1.0.0",
+            sw_version="1.0.2",
         )
 
     def trigger(self, trigger: str) -> None:
