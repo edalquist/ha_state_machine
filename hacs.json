@@ -1,0 +1,6 @@
+{
+  "name": "State Machine",
+  "hide_default_branch": true,
+  "homeassistant": "2024.4.1",
+  "hacs": "0.19.0",
+}

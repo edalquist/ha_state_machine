@@ -1,7 +1,11 @@
-# Finite State Machine Sensors.
+# Finite State Machine Sensor
 
-Creates sensors whos state is backed by a Finite State Machine and a corresponding service that is
+Creates sensors who's state is backed by a Finite State Machine and a corresponding action that is
 used to trigger state changes.
+
+## Installation
+
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=edalquist&repository=ha_state_machine&category=integration)
 
 ## Configuration
 
@@ -51,7 +55,7 @@ Uses the FSM above, configured as `sensor.dryer_state`. Triggers are a faux drie
 `input_number.dryer_power` and the FSM sensor when it transitions to the `DONE` state where
 we want to take an action.
 
-The automation uses the `state_machine.trigger` service to send triggers to the `sensor.dryer_state`
+The automation uses the `state_machine.trigger` action to send triggers to the `sensor.dryer_state`
 state machine entity based on the dryer's current power.
 
 When the state machine eventually cycles to `DONE` that trigger results in a notification being sent.
