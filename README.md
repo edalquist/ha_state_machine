@@ -111,3 +111,9 @@ action:
 mode: queued
 max: 10
 ```
+
+## Related Software
+
+### hasmtools
+
+[Hasmtools](https://github.com/mutax/hasmtools) is a small python utility to visualize the state machine and convert the JSON configuration to/from YAML, started as a simple proof of concept. Code and examples are available on [GitHub](https://github.com/mutax/hasmtools) and the package can be found on [PyPI](https://pypi.org/project/hasmtools/).
