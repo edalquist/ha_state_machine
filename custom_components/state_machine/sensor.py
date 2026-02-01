@@ -19,6 +19,7 @@ from homeassistant.helpers import entity_platform
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.restore_state import RestoreEntity
 
 from .const import DOMAIN, StateMachineEntityFeature
 
@@ -136,7 +137,7 @@ async def async_trigger(entity: StateMachineSensorEntity, call: ServiceCall) -> 
     entity.trigger(call.data["trigger"])
 
 
-class StateMachineSensorEntity(SensorEntity):
+class StateMachineSensorEntity(SensorEntity, RestoreEntity):
     """state_machine Sensor."""
 
     # Our class is PUSH, so we tell HA that it should not be polled
@@ -223,3 +224,14 @@ class StateMachineSensorEntity(SensorEntity):
         This is the only method that should fetch new data for Home Assistant.
         """
         return self._machine.state
+
+    async def async_added_to_hass(self) -> None:
+        """Restore state on startup."""
+        await super().async_added_to_hass()
+
+        state = await self.async_get_last_state()
+        if not state:
+            return
+        
+        self._machine.set_state(state.state)
+        self._attr_native_value = state.state
