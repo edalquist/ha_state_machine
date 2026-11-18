@@ -1,16 +1,12 @@
 {
   "domain": "state_machine",
   "name": "State Machine",
-  "version": "1.0.2",
+  "codeowners": ["@edalquist"],
   "config_flow": true,
   "documentation": "https://github.com/edalquist/ha_state_machine",
+  "integration_type": "helper",
+  "iot_class": "calculated",
   "issue_tracker": "https://github.com/edalquist/ha_state_machine/issues",
-  "requirements": ["transitions==0.9.2"],
-  "ssdp": [],
-  "zeroconf": [],
-  "homekit": {},
-  "dependencies": [],
-  "codeowners": ["@edalquist"],
-  "iot_class": "local_push",
-  "integration_type": "helper"
+  "requirements": ["transitions==0.9.3"],
+  "version": "1.0.2"
 }
