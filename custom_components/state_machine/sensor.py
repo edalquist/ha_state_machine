@@ -9,18 +9,25 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, Self
 
 import transitions
-from homeassistant.components.sensor import SensorEntity
+from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import CALLBACK_TYPE, Context, HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
-from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.restore_state import ExtraStoredData, RestoreEntity
 from homeassistant.util import dt as dt_util
 
 from . import StateMachineConfigEntry
-from .const import DOMAIN, EVENT_TIMEOUT, StateMachineEntityFeature
+from .const import (
+    ATTR_AVAILABLE_TRIGGERS,
+    ATTR_PREVIOUS_STATE,
+    ATTR_TIMEOUT_AT,
+    DOMAIN,
+    EVENT_TIMEOUT,
+    StateMachineEntityFeature,
+)
 from .fsm import FsmConfig, StateMachine
 
 _LOGGER = logging.getLogger(__name__)
@@ -68,6 +75,9 @@ async def async_setup_entry(
 class StateMachineSensorEntity(RestoreEntity, SensorEntity):
     """Finite State Machine sensor entity."""
 
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_has_entity_name = True
+    _attr_name = None
     _attr_should_poll = False
     _attr_icon = "mdi:state-machine"
     _attr_supported_features: StateMachineEntityFeature = (
@@ -78,8 +88,13 @@ class StateMachineSensorEntity(RestoreEntity, SensorEntity):
         """Initialize the State Machine sensor."""
         super().__init__()
         self._machine = StateMachine(fsm_config)
-        self._attr_name = name
         self._attr_unique_id = unique_id
+        self._attr_options = list(fsm_config.states)
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, unique_id)},
+            name=name,
+            entry_type=DeviceEntryType.SERVICE,
+        )
         self._previous_state: str | None = None
         self._cancel_timeout: CALLBACK_TYPE | None = None
         self._timeout_at: datetime | None = None
@@ -201,13 +216,13 @@ class StateMachineSensorEntity(RestoreEntity, SensorEntity):
         self.async_write_ha_state()
 
     @property
-    def device_info(self) -> DeviceInfo:
-        """Information about this entity/device."""
-        return DeviceInfo(
-            identifiers={(DOMAIN, str(self._attr_unique_id))},
-            name=self.name,
-            sw_version="1.0.2",
-        )
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return dynamic FSM state metadata attributes."""
+        return {
+            ATTR_AVAILABLE_TRIGGERS: self._machine.available_triggers(),
+            ATTR_PREVIOUS_STATE: self._previous_state,
+            ATTR_TIMEOUT_AT: self._timeout_at.isoformat() if self._timeout_at else None,
+        }
 
     async def async_trigger_service(self, trigger: str) -> None:
         """Handle state_machine.trigger entity action."""
