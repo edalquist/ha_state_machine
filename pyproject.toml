@@ -1,0 +1,26 @@
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC"]
+
+[tool.mypy]
+python_version = "3.14"
+explicit_package_bases = true
+namespace_packages = true
+check_untyped_defs = true
+disallow_incomplete_defs = true
+warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+module = [
+    "transitions",
+    "transitions.*",
+    "pytest_homeassistant",
+    "pytest_homeassistant.*",
+]
+ignore_missing_imports = true

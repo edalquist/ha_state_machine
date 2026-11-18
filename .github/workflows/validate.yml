@@ -1,0 +1,43 @@
+name: Validate
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.14"
+      - name: Install dependencies
+        run: |
+          uv venv
+          uv pip install --python .venv/bin/python pytest-homeassistant transitions==0.9.3 ruff mypy
+      - name: Lint and format check
+        run: |
+          .venv/bin/ruff check custom_components tests
+          .venv/bin/ruff format --check custom_components tests
+      - name: Type check
+        run: .venv/bin/mypy custom_components/state_machine tests
+      - name: Run unit tests
+        run: .venv/bin/pytest -v
+
+  hassfest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: home-assistant/actions/hassfest@master
+
+  hacs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hacs/action@main
+        with:
+          category: integration
