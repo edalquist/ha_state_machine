@@ -5,8 +5,6 @@ trigger:
     entity:
       domain: sensor
       integration: state_machine
-    device:
-      integration: state_machine
   fields:
     trigger:
       name: Trigger
@@ -22,8 +20,6 @@ set_state:
   target:
     entity:
       domain: sensor
-      integration: state_machine
-    device:
       integration: state_machine
   fields:
     state:

@@ -18,16 +18,17 @@
         "data_description": {
           "schema": "Define the initial state ('state.status') and 'transitions' map in YAML or JSON format."
         },
+        "description": "Create a Finite State Machine helper sensor.",
         "title": "Configure State Machine"
       }
     }
   },
   "exceptions": {
     "invalid_state": {
-      "message": "State '{state}' is not valid for {entity_id}. Valid states: {valid_states}."
+      "message": "State \"{state}\" is not valid for {entity_id}. Valid states: {valid_states}."
     },
     "invalid_trigger": {
-      "message": "Trigger '{trigger}' is not defined on {entity_id}."
+      "message": "Trigger \"{trigger}\" is not defined on {entity_id}."
     }
   },
   "options": {
@@ -47,6 +48,7 @@
         "data_description": {
           "schema": "Define the initial state ('state.status') and 'transitions' map in YAML or JSON format."
         },
+        "description": "Update the Finite State Machine schema.",
         "title": "Configure State Machine Schema"
       }
     }
