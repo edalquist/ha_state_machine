@@ -1,5 +1,6 @@
 trigger:
-  description: FSM Transition Trigger.
+  name: Trigger
+  description: Execute a transition trigger on a State Machine entity.
   target:
     entity:
       domain: sensor
@@ -9,8 +10,26 @@ trigger:
   fields:
     trigger:
       name: Trigger
-      description: The name of the trigger to execute on the target Finite State Machine
+      description: The name of the trigger to execute on the target Finite State Machine.
       example: below
+      required: true
+      selector:
+        text:
+
+set_state:
+  name: Set state
+  description: Override the current state of a State Machine entity.
+  target:
+    entity:
+      domain: sensor
+      integration: state_machine
+    device:
+      integration: state_machine
+  fields:
+    state:
+      name: State
+      description: The target state name to force the Finite State Machine into.
+      example: IDLE
       required: true
       selector:
         text:

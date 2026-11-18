@@ -9,23 +9,10 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, Self
 
 import transitions
-
-try:
-    import probatio as vol
-except ImportError:  # pragma: no cover
-    import voluptuous as vol  # type: ignore[no-redef]
-
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
-from homeassistant.core import (
-    CALLBACK_TYPE,
-    Context,
-    HomeAssistant,
-    ServiceCall,
-    callback,
-)
-from homeassistant.helpers import config_validation as cv
-from homeassistant.helpers import entity_platform
+from homeassistant.core import CALLBACK_TYPE, Context, HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_call_later
@@ -76,19 +63,6 @@ async def async_setup_entry(
 
     sme = StateMachineSensorEntity(unique_id, name, fsm_config)
     async_add_entities([sme])
-
-    platform = entity_platform.async_get_current_platform()
-    platform.async_register_entity_service(
-        "trigger",
-        {vol.Required("trigger"): cv.string},
-        async_trigger,
-        [StateMachineEntityFeature.TRANSITION],
-    )
-
-
-async def async_trigger(entity: StateMachineSensorEntity, call: ServiceCall) -> None:
-    """Handle Trigger Events."""
-    entity.trigger(call.data["trigger"])
 
 
 class StateMachineSensorEntity(RestoreEntity, SensorEntity):
@@ -235,36 +209,79 @@ class StateMachineSensorEntity(RestoreEntity, SensorEntity):
             sw_version="1.0.2",
         )
 
+    async def async_trigger_service(self, trigger: str) -> None:
+        """Handle state_machine.trigger entity action."""
+        self.trigger(trigger)
+
+    async def async_set_state_service(self, state: str) -> None:
+        """Handle state_machine.set_state entity action."""
+        self.set_state(state)
+
     def trigger(self, trigger: str) -> None:
-        """Execute the trigger."""
+        """Execute a transition trigger on the state machine."""
         pre_state = self._machine.state
 
         if not self._machine.has_trigger(trigger):
-            raise transitions.core.MachineError(
-                f"'{trigger}' is not a possible trigger on '{self.name}'"
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="invalid_trigger",
+                translation_placeholders={
+                    "trigger": trigger,
+                    "entity_id": self.entity_id,
+                },
             )
 
         if not self._machine.may_trigger(trigger):
-            _LOGGER.debug("Cannot trigger %s from %s", trigger, self._machine.state)
+            _LOGGER.debug(
+                "Ignoring trigger '%s' on '%s': invalid from state '%s'",
+                trigger,
+                self.entity_id,
+                self._machine.state,
+            )
             return
 
         try:
             transitioned = self._machine.trigger(trigger)
         except transitions.core.MachineError as exc:
-            _LOGGER.error(
-                "Trigger Error %s on %s[%s]: %s", trigger, self.name, self.state, exc
-            )
-            return
+            raise HomeAssistantError(
+                f"Failed to execute trigger '{trigger}' on '{self.entity_id}': {exc}"
+            ) from exc
 
         if transitioned:
             self._previous_state = pre_state
             self._async_schedule_timeout()
             self.async_write_ha_state()
 
-        _LOGGER.info(
+        _LOGGER.debug(
             "Trigger '%s' on '%s' [%s -> %s]",
             trigger,
-            self.name,
+            self.entity_id,
+            pre_state,
+            self._machine.state,
+        )
+
+    def set_state(self, state: str) -> None:
+        """Force the state machine into a specific valid state."""
+        if state not in self._machine.states:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="invalid_state",
+                translation_placeholders={
+                    "state": state,
+                    "entity_id": self.entity_id,
+                    "valid_states": ", ".join(self._machine.states),
+                },
+            )
+
+        pre_state = self._machine.state
+        self._machine.set_state(state)
+        self._previous_state = pre_state
+        self._async_schedule_timeout()
+        self.async_write_ha_state()
+
+        _LOGGER.debug(
+            "Set state on '%s' [%s -> %s]",
+            self.entity_id,
             pre_state,
             self._machine.state,
         )

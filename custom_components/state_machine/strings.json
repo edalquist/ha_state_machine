@@ -1,0 +1,76 @@
+{
+  "config": {
+    "error": {
+      "invalid_name": "Name cannot be empty",
+      "invalid_schema": "Schema must be a valid YAML or JSON mapping",
+      "invalid_timeout": "Timeout must specify a positive numeric 'after' duration and a non-empty string 'to' state",
+      "invalid_transitions": "Each state in 'transitions' must map trigger names to destination state names",
+      "no_state_or_status": "Schema does not have a valid initial 'state.status' specified",
+      "no_transitions": "No transitions specified",
+      "schema_parse_error": "Failed to parse Schema"
+    },
+    "step": {
+      "user": {
+        "data": {
+          "name": "State Machine Name",
+          "schema": "State Machine Schema"
+        },
+        "data_description": {
+          "schema": "Define the initial state ('state.status') and 'transitions' map in YAML or JSON format."
+        },
+        "title": "Configure State Machine"
+      }
+    }
+  },
+  "exceptions": {
+    "invalid_state": {
+      "message": "State '{state}' is not valid for {entity_id}. Valid states: {valid_states}."
+    },
+    "invalid_trigger": {
+      "message": "Trigger '{trigger}' is not defined on {entity_id}."
+    }
+  },
+  "options": {
+    "error": {
+      "invalid_schema": "Schema must be a valid YAML or JSON mapping",
+      "invalid_timeout": "Timeout must specify a positive numeric 'after' duration and a non-empty string 'to' state",
+      "invalid_transitions": "Each state in 'transitions' must map trigger names to destination state names",
+      "no_state_or_status": "Schema does not have a valid initial 'state.status' specified",
+      "no_transitions": "No transitions specified",
+      "schema_parse_error": "Failed to parse Schema"
+    },
+    "step": {
+      "init": {
+        "data": {
+          "schema": "State Machine Schema"
+        },
+        "data_description": {
+          "schema": "Define the initial state ('state.status') and 'transitions' map in YAML or JSON format."
+        },
+        "title": "Configure State Machine Schema"
+      }
+    }
+  },
+  "services": {
+    "set_state": {
+      "description": "Override the current state of a State Machine entity.",
+      "fields": {
+        "state": {
+          "description": "The target state name to force the Finite State Machine into.",
+          "name": "State"
+        }
+      },
+      "name": "Set state"
+    },
+    "trigger": {
+      "description": "Execute a transition trigger on a State Machine entity.",
+      "fields": {
+        "trigger": {
+          "description": "The name of the trigger to execute on the target Finite State Machine.",
+          "name": "Trigger"
+        }
+      },
+      "name": "Trigger"
+    }
+  }
+}

@@ -5,19 +5,61 @@ from __future__ import annotations
 import json
 import logging
 
+try:
+    import probatio as vol
+except ImportError:  # pragma: no cover
+    import voluptuous as vol  # type: ignore[no-redef]
+
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryError
+from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import service
+from homeassistant.helpers.typing import ConfigType
 
-from .const import CONF_SCHEMA, CONF_SCHEMA_JSON
+from .const import (
+    ATTR_STATE,
+    ATTR_TRIGGER,
+    CONF_SCHEMA,
+    CONF_SCHEMA_JSON,
+    DOMAIN,
+    SERVICE_SET_STATE,
+    SERVICE_TRIGGER,
+    StateMachineEntityFeature,
+)
 from .fsm import FsmConfig, FsmValidationError, parse_fsm_schema
 
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: list[Platform] = [Platform.SENSOR]
 
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
 type StateMachineConfigEntry = ConfigEntry[FsmConfig]
+
+
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Set up the State Machine integration and register actions."""
+    service.async_register_platform_entity_service(
+        hass,
+        DOMAIN,
+        SERVICE_TRIGGER,
+        entity_domain=Platform.SENSOR,
+        schema={vol.Required(ATTR_TRIGGER): cv.string},
+        func="async_trigger_service",
+        required_features=[StateMachineEntityFeature.TRANSITION],
+    )
+    service.async_register_platform_entity_service(
+        hass,
+        DOMAIN,
+        SERVICE_SET_STATE,
+        entity_domain=Platform.SENSOR,
+        schema={vol.Required(ATTR_STATE): cv.string},
+        func="async_set_state_service",
+        required_features=[StateMachineEntityFeature.TRANSITION],
+    )
+    return True
 
 
 async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
