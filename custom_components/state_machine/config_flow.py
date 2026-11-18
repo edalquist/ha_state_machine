@@ -2,155 +2,117 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-import json
 import logging
 from typing import Any
 
-import voluptuous as vol
+try:
+    import probatio as vol
+except ImportError:  # pragma: no cover
+    import voluptuous as vol  # type: ignore[no-redef]
 
-from homeassistant import config_entries, core, data_entry_flow
-from homeassistant.config_entries import ConfigFlow
+from homeassistant.config_entries import (
+    ConfigEntry,
+    ConfigFlow,
+    ConfigFlowResult,
+    OptionsFlow,
+)
 from homeassistant.core import callback
-from homeassistant.data_entry_flow import FlowResult
-import homeassistant.helpers.config_validation as cv
-from homeassistant.helpers.selector import TextSelector, TextSelectorConfig
+from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.selector import ObjectSelector
 
-from .const import DOMAIN
-
-CONF_NAME = "name"
-CONF_SCHEMA_JSON = "schema_json"
+from .const import CONF_NAME, CONF_SCHEMA, DOMAIN
+from .fsm import DEFAULT_FSM_SCHEMA, FsmValidationError, parse_fsm_schema
 
 _LOGGER = logging.getLogger(__name__)
 
-
-@dataclass
-class FsmConfig:
-    """Config Data."""
-
-    name: str
-    schema_str: str
+OPTIONS_SCHEMA = vol.Schema({vol.Required(CONF_SCHEMA): ObjectSelector()})
+USER_SCHEMA = vol.Schema({vol.Required(CONF_NAME): cv.string}).extend(
+    OPTIONS_SCHEMA.schema
+)
 
 
 class StateMachineConfigFlow(ConfigFlow, domain=DOMAIN):
-    """State Machine config flow."""
+    """Handle a config flow for State Machine."""
 
-    name: str = None
-    schema_str: str = None
+    VERSION = 2
+    MINOR_VERSION = 1
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Handle a flow initiated by the user."""
+        errors: dict[str, str] = {}
 
-        if user_input is None:
-            _LOGGER.debug("No user input, showing setup form")
-            return self.async_show_form(
-                step_id="user",
-                data_schema=_build_setup_schema(self.hass, self.name, self.schema_str),
-            )
+        if user_input is not None:
+            name = user_input[CONF_NAME].strip()
+            if not name:
+                errors[CONF_NAME] = "invalid_name"
 
-        # Capture user input
-        self.name = user_input[CONF_NAME]
-        self.schema_str = user_input[CONF_SCHEMA_JSON]
+            schema = user_input[CONF_SCHEMA]
+            try:
+                parse_fsm_schema(schema)
+            except FsmValidationError as err:
+                _LOGGER.debug("FSM schema validation failed: %s", err)
+                errors[CONF_SCHEMA] = err.error_key
 
-        errors = _validate_state_machine(self.schema_str)
-        if errors:
-            return self.async_show_form(
-                step_id="user",
-                data_schema=_build_setup_schema(self.hass, self.name, self.schema_str),
-                errors=errors,
-            )
+            if not errors:
+                return self.async_create_entry(
+                    title=name,
+                    data={},
+                    options={CONF_SCHEMA: schema},
+                )
 
-        # No errors, create the entity
-        return self.async_create_entry(
-            title=self.name,
-            data={},
-            options={CONF_SCHEMA_JSON: self.schema_str},
+        suggested = (
+            user_input if user_input is not None else {CONF_SCHEMA: DEFAULT_FSM_SCHEMA}
+        )
+        data_schema = self.add_suggested_values_to_schema(USER_SCHEMA, suggested)
+        return self.async_show_form(
+            step_id="user",
+            data_schema=data_schema,
+            errors=errors,
         )
 
     @staticmethod
     @callback
-    def async_get_options_flow(config_entry):
+    def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlowHandler:
         """Get the options flow for this handler."""
-        return OptionsFlowHandler(config_entry)
+        return OptionsFlowHandler()
 
 
-class OptionsFlowHandler(config_entries.OptionsFlow):
-    """Options Flow Handler."""
-
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        """Initialize options flow."""
-        _LOGGER.debug("Init Options UI: %s", config_entry.as_dict())
-        self.schema_str = config_entry.options[CONF_SCHEMA_JSON]
-        self.name = config_entry.title
+class OptionsFlowHandler(OptionsFlow):
+    """Handle options for State Machine."""
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
-    ) -> data_entry_flow.FlowResult:
+    ) -> ConfigFlowResult:
         """Manage the options."""
+        errors: dict[str, str] = {}
 
-        if user_input is None:
-            _LOGGER.debug("No user input, showing setup form")
-            return self.async_show_form(
-                step_id="init",
-                data_schema=_build_options_schema__states(self.hass, self.schema_str),
-            )
+        if user_input is not None:
+            schema = user_input[CONF_SCHEMA]
+            try:
+                parse_fsm_schema(schema)
+            except FsmValidationError as err:
+                _LOGGER.debug("FSM schema validation failed: %s", err)
+                errors[CONF_SCHEMA] = err.error_key
+            else:
+                return self.async_create_entry(
+                    title="",
+                    data={CONF_SCHEMA: schema},
+                )
 
-        # Capture user input
-        self.schema_str = user_input[CONF_SCHEMA_JSON]
-
-        errors = _validate_state_machine(self.schema_str)
-        if errors:
-            return self.async_show_form(
-                step_id="user",
-                data_schema=_build_setup_schema(self.hass, self.name, self.schema_str),
-                errors=errors,
-            )
-
-        # No errors, update the entity
-        return self.async_create_entry(
-            title=self.name,
-            data={CONF_SCHEMA_JSON: self.schema_str},
+        suggested = (
+            user_input
+            if user_input is not None
+            else {
+                CONF_SCHEMA: self.config_entry.options.get(
+                    CONF_SCHEMA, DEFAULT_FSM_SCHEMA
+                )
+            }
         )
-
-
-def _build_setup_schema(
-    hass: core.HomeAssistant, name: str, schema_str: str
-) -> vol.Schema:
-    return vol.Schema({vol.Required(CONF_NAME, default=name): cv.string}).extend(
-        _build_options_schema__states(hass, schema_str).schema
-    )
-
-
-def _build_options_schema__states(
-    hass: core.HomeAssistant, schema_str: str
-) -> vol.Schema:
-    return vol.Schema(
-        {
-            vol.Required(CONF_SCHEMA_JSON, default=schema_str): TextSelector(
-                TextSelectorConfig(multiline=True)
-            )
-        }
-    )
-
-
-def _validate_state_machine(schema_str: str) -> dict[str, str]:
-    """Validate the state machine input."""
-    errors = {}
-
-    try:
-        # Parse the schema
-        schema = json.loads(schema_str)
-        _LOGGER.debug("Parsed schema: %s", schema)
-
-        # Validate schema structure
-        if "state" not in schema or "status" not in schema["state"]:
-            errors[CONF_SCHEMA_JSON] = "no_state_or_status"
-        elif "transitions" not in schema or not schema["transitions"]:
-            errors[CONF_SCHEMA_JSON] = "no_transitions"
-    except ValueError as exc:
-        _LOGGER.warning("Schema Parse Error: %s", exc)
-        errors[CONF_SCHEMA_JSON] = "schema_parse_error"
-
-    return errors
+        data_schema = self.add_suggested_values_to_schema(OPTIONS_SCHEMA, suggested)
+        return self.async_show_form(
+            step_id="init",
+            data_schema=data_schema,
+            errors=errors,
+        )
