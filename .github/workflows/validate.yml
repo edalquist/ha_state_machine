@@ -11,13 +11,15 @@ jobs:
   lint-and-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
         with:
           python-version: "3.14"
+          cache-dependency-glob: pyproject.toml
       - name: Install dependencies
         run: |
-          uv venv
+          uv python install 3.14
+          uv venv --python 3.14 .venv
           uv pip install --python .venv/bin/python pytest-homeassistant transitions==0.9.3 ruff mypy
       - name: Lint and format check
         run: |
@@ -31,13 +33,13 @@ jobs:
   hassfest:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: home-assistant/actions/hassfest@master
 
   hacs:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: hacs/action@main
         with:
           category: integration
